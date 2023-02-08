@@ -112,24 +112,34 @@ app_license = "MIT"
 
 # Scheduled Tasks
 # ---------------
+test_string = "value"
+test_list = ["value"]
+test_dict = {
+    "key": "value"
+}
 
-# scheduler_events = {
-#	"all": [
-#		"scheduler_task.tasks.all"
-#	],
-#	"daily": [
-#		"scheduler_task.tasks.daily"
-#	],
-#	"hourly": [
-#		"scheduler_task.tasks.hourly"
-#	],
-#	"weekly": [
-#		"scheduler_task.tasks.weekly"
-#	],
-#	"monthly": [
-#		"scheduler_task.tasks.monthly"
-#	],
-# }
+scheduler_events = {
+    "cron": {
+        "* * * * *": [
+            "scheduler_task.tasks.crons"
+        ]
+    },
+	"all": [
+		"scheduler_task.tasks.crons"
+	],
+	"daily": [
+		"scheduler_task.tasks.cron"
+	],
+	"hourly": [
+		"scheduler_task.tasks.hourly"
+	],
+	"weekly": [
+		"scheduler_task.tasks.weekly"
+	],
+	"monthly": [
+		"scheduler_task.tasks.monthly"
+	],
+}
 
 # Testing
 # -------
