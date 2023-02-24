@@ -3,8 +3,8 @@ import string
 import random
 import json
 from frappe.utils.pdf import get_pdf
-
-import datetime
+import asyncio
+from pyppeteer import launch
 from datetime import date
 
 from dateutil.relativedelta import relativedelta
@@ -16,17 +16,8 @@ from api_backend_gateway import *
 
 
 
-def html_to_pdf(html_string):
-    # # Create a file-like buffer to receive PDF data.
-    # buffer = BytesIO()
-    # # Create the PDF object, using the buffer as its "file."
-    # p = canvas.Canvas(buffer)
-    # # Draw things on the PDF. Here's where the HTML content is added.
-    # p.drawString(100, 100, html_string)
-    # # Close the PDF object cleanly, and we're done.
-    # p.showPage()
-    # p.save()
-    return buffer
+
+
 
 @frappe.whitelist()
 def site_power_custom(dateFrom, dateTo, site_name):
@@ -131,34 +122,7 @@ def cron():
                 <script src="https://unpkg.com/frappe-charts@latest"></script>
             </head>
             <body>
-                <h1>Plink Site's Power Daily Report</h1>
-                
-                <hr class="rounded">
-                <div id="chart">
-                </div>
-                <script>
-                var chart_data = JSON.parse('{chardump}')
-                var chart = new frappe.Chart("#chart", {{
-                    type: 'bar',
-                    data: chart_data,
-                    type: "axis-mixed", // or 'bar', 'line', 'pie', 'percentage'
-                    height: 300,
-                    download: true,
-                    colors: ["#0F6292"],
-                    axisOptions: {{
-                    xAxisMode: "tick",
-                    xIsSeries: true
-                    }},
-                    barOptions: {{
-                    stacked: true,
-                    spaceRatio: 0.5
-                    }},
-                    tooltipOptions: {{
-                    formatTooltipX: (d) => (d + "").toUpperCase(),
-                    formatTooltipY: (d) => d + " pts"
-                    }}
-                }});
-                </script>"""
+                <h1>Plink Site's Power Daily Report</h1>"""
     html += "<br>"
     html += "<br>"
     html += "<br>"
@@ -173,81 +137,29 @@ def cron():
             power=data['power_total'] / 1000
         )
     html += "</tbody></table>"
-    html += "<br>"
-    html += "<br>"
-    html += "<br>"
-    html += "<hr class=\"solid\">"  
-    html += "<h2>Site's power daily detail list </h2>"
-    html += "<hr class=\"solid\">"  
-    html += "<br>"
-    html += "<table><thead><tr><th>Site Name</th><th>Power (kWh)</th><th>From</th><th>To</th></tr></thead><tbody>"
-    for data in powerMonthlyArr:
-        html += "<tr><td>{site_name}</td><td>{power}</td><td>{from_date}</td><td>{to_date}</td></tr>".format(
-            site_name=data['site_name'],
-            power=data['power'] / 1000,
-            from_date=data['from'],
-            to_date=data['to']
-        )
-    html += "</tbody></table>"
-
-   
 
     html += "</body></html>"
     html += "<style>table {width: 100%} h1, h2, h3, th, td{text-align: center}table, th, td {border: 1px solid black;border-collapse: collapse;}th, td {padding-top: 10px;padding-bottom: 20px;padding-left: 30px;padding-right: 40px;}</style>"
-
-    #############HTML REPORT EDIT#############
-    # html = "<body><h1>Plink Sites's Power Daily Report</h1>"
-    # html += """<p>This report is sent daily.</p>"""
-    # html += "<table><thead><tr><th>Site Name</th><th>Power</th><th>From</th><th>To</th></tr></thead><tbody>"
-    # for data in powerMonthlyArr:
-    #     html += "<tr><td>{site_name}</td><td>{power}</td><td>{from_date}</td><td>{to_date}</td></tr>".format(
-    #         site_name=data['site_name'],
-    #         power=data['power'],
-    #         from_date=data['from'],
-    #         to_date=data['to']
-    #     )
-    # html += "</tbody></table></body>"
-    # html += "<style>h1{text-align: center}table, th, td {border: 1px solid black;border-collapse: collapse;}th, td {padding-top: 10px;padding-bottom: 20px;padding-left: 30px;padding-right: 40px;}</style>"
     
-
-
-
-
-
-    # Generate the PDF from the HTML
+    text_file = open('/home/phuongtung0801/frappe-bench-prod/apps/scheduler_task/scheduler_task/indextung3.html','w')
+    text_file.writelines(html)
+    text_file.close()
     
+    # html = """
+    # <p><strong>This text is bold.</strong></p>
+    # <p><span style="font-size: 16px;">This text is size 16.</span></p>
+    # <p><span style="color: red;">This text is red.</span></p>
+    #         """
+
     try:
-        pdf_content = get_pdf(html)
-        # htmlweasy = HTML(html)
-        # pdf_content2 = htmlweasy.write_pdf()
-        #open the file
-        text_file = open('/home/phuongtung0801/frappe-bench-prod/apps/scheduler_task/scheduler_task/indextung3.html','w')
-        text_file.writelines(html)
-        text_file.close()
-
-        # Convert the HTML string to a PDF file
-        pdf_file = html_to_pdf(html)
-        # Save the PDF file
-        with open("/home/phuongtung0801/frappe-bench-prod/apps/scheduler_task/scheduler_task/index.pdf", "wb") as f:
-            f.write(pdf_file.getvalue())
-
-
-        with open("/home/phuongtung0801/frappe-bench-prod/apps/scheduler_task/scheduler_task/indextung113.pdf", "wb") as f:
-            f.write(pdf_content)
+        frappe.sendmail(
+            recipients=["phuongtung0801+23@gmail.com", "phuongtung.tran0801+23@gmail.com"],
+            subject="Plink Sites's Power Daily Report",
+            message=html,
+            delayed= False,
+            attachments=[]
+        )
     except Exception as e:
-        print(e)
-    # try:
-    #     frappe.sendmail(
-    #         recipients=["phuongtung0801+23@gmail.com", "phuongtung.tran0801+23@gmail.com"],
-    #         subject="Plink Sites's Power Daily Report",
-    #         message="Hi, this is the daily sites's power report.",
-    #         delayed= False,
-    #         attachments=[{
-    #             "fname": "plink_sitespower_daily_report.html",
-    #             "fcontent": html
-    #         }]
-    #     )
-    # except Exception as e:
-    #     return ("Error"+str(e))
+        return ("Error"+str(e))
     return "No Err Found"
     
