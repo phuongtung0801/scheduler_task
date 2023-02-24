@@ -3,21 +3,19 @@ import string
 import random
 import json
 from frappe.utils.pdf import get_pdf
-import asyncio
-from pyppeteer import launch
 from datetime import date
 
 from dateutil.relativedelta import relativedelta
 from frappe.utils import get_path
 
 import sys
-sys.path.insert(0, '/home/phuongtung0801/frappe-bench-prod/apps/power_stuffs/power_stuffs/')
+from pathlib import Path
+parent_dir_path = str(Path(__file__).resolve().parents[2])
+sys.path.append(parent_dir_path + "/power_stuffs/power_stuffs/")
+sys.path.append(parent_dir_path + "/scheduler_task/scheduler_task/")
+
 from api_backend_gateway import *
-
-
-
-
-
+from html_template_script import html_template
 
 @frappe.whitelist()
 def site_power_custom(dateFrom, dateTo, site_name):
@@ -102,33 +100,14 @@ def cron():
         powerSum.append({"site_name": site, "power_total": site_test["powerSum"], "date": today})
   
 
-    labels = [item["site_name"] for item in powerSum]
-    values = [item["power_total"] / 1000 for item in powerSum]
-    #####CHART CONFIG#####
-    str_obj = {"somedata": "Hello","charType": "bar","values":values}
-    datasetsArr = [str_obj]
-    
+    today = datetime.date.today()
 
-    chart_data = {
-        "labels": labels,
-        "datasets": [{"name": "Power", "chartType": "bar","values": values}],
-        "type": "bar"
-    }
-    chardump = json.dumps(chart_data)
-
-    html = f"""
-            <html>
-            <head>
-                <script src="https://unpkg.com/frappe-charts@latest"></script>
-            </head>
-            <body>
-                <h1>Plink Site's Power Daily Report</h1>"""
+    html = """
+            
+            <body>"""
+    html += f"""<h1>Plink Site's Power Daily Report {today}</h1>"""
     html += "<br>"
     html += "<br>"
-    html += "<br>"
-    html += "<hr class=\"solid\">"  
-    html += "<h2>Site's total power daily today </h2>"
-    html += "<hr class=\"solid\">"  
     html += "<br>"
     html += "<table><thead><tr><th colspan=\"5\">Site Name</th><th>Total Power (kWh)</th></tr></thead><tbody>"
     for data in powerSum:
@@ -138,24 +117,28 @@ def cron():
         )
     html += "</tbody></table>"
 
-    html += "</body></html>"
-    html += "<style>table {width: 100%} h1, h2, h3, th, td{text-align: center}table, th, td {border: 1px solid black;border-collapse: collapse;}th, td {padding-top: 10px;padding-bottom: 20px;padding-left: 30px;padding-right: 40px;}</style>"
+    html += "</body>"
     
     text_file = open('/home/phuongtung0801/frappe-bench-prod/apps/scheduler_task/scheduler_task/indextung3.html','w')
-    text_file.writelines(html)
+    text_file.writelines(html_template)
     text_file.close()
     
-    # html = """
-    # <p><strong>This text is bold.</strong></p>
-    # <p><span style="font-size: 16px;">This text is size 16.</span></p>
-    # <p><span style="color: red;">This text is red.</span></p>
-    #         """
+    html2 = """
+    <html>
+    <body>
+    <p><strong>This text is bold.</strong></p>
+    <p><span style="font-size: 16px;">This text is size 16.</span></p>
+    <p><span style="color: red;">This text is red.</span></p>
+    <br>
+    </body>
+    </html>
+            """
 
     try:
         frappe.sendmail(
             recipients=["phuongtung0801+23@gmail.com", "phuongtung.tran0801+23@gmail.com"],
             subject="Plink Sites's Power Daily Report",
-            message=html,
+            message=html_template,
             delayed= False,
             attachments=[]
         )
