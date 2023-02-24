@@ -1,17 +1,64 @@
 import frappe
 import string
 import random
+import json
 from frappe.utils.pdf import get_pdf
-import jinja2
+
 import datetime
 from datetime import date
 
 from dateutil.relativedelta import relativedelta
 from frappe.utils import get_path
 
+import sys
+sys.path.insert(0, '/home/phuongtung0801/frappe-bench-prod/apps/power_stuffs/power_stuffs/')
+from api_backend_gateway import *
+
+
+
+def html_to_pdf(html_string):
+    # # Create a file-like buffer to receive PDF data.
+    # buffer = BytesIO()
+    # # Create the PDF object, using the buffer as its "file."
+    # p = canvas.Canvas(buffer)
+    # # Draw things on the PDF. Here's where the HTML content is added.
+    # p.drawString(100, 100, html_string)
+    # # Close the PDF object cleanly, and we're done.
+    # p.showPage()
+    # p.save()
+    return buffer
 
 @frappe.whitelist()
-def site_power_custom2(dateFrom, dateTo, site_name):
+def site_power_custom(dateFrom, dateTo, site_name):
+
+
+    # #######
+    powerMonthlyArr  = []
+    sum = 0
+    # dateStringStart = datetime.datetime(year, month, day, 00, 00, 00)
+    # dateStringEnd = datetime.datetime(year, month, day, 23, 59, 59)
+    queryString = f"""select site_name, power_per_hour, `from`, `to` from `tabSite Power Per Hour`  where site_name = "{site_name}" and `from` > "{dateFrom}" and `to` < "{dateTo}" order by `from` asc"""
+    # return queryString
+    docArr = frappe.db.sql(queryString)
+    for element in docArr:
+        sum = sum + element[1]
+        jsonObjDay = {
+            "site_name": element[0],
+            "power": element[1],
+            "from": element[2],
+            "to": element[3]
+        }
+        powerMonthlyArr.append(jsonObjDay)
+    response = {
+        "length": len(powerMonthlyArr),
+        "powerSum": sum,
+        "body": powerMonthlyArr
+    }
+    return response 
+
+
+@frappe.whitelist()
+def site_power_detail(dateFrom, dateTo, site_name):
 
     # #######
     powerMonthlyArr  = []
@@ -50,54 +97,157 @@ def cron():
     todayStart = str(today) + " 00:00:00"
     todayEnd = str(today) + " 23:59:59"
 
-
+    ####site power details####
     powerMonthlyArr = []
     for site in siteListParsed:
             # return {"dateFrom":"2023-02-07 00:00:00","dateTo":"2023-02-07 18:00:00","site_name": {site}}
-            site_data = site_power_custom2(todayStart,todayEnd,site)
+            site_data = site_power_detail(todayStart,todayEnd,site)
             for element in site_data["body"]:
                 powerMonthlyArr.append(element)
+    ####site power total of each site list######
+    powerSum = []
+    for site in siteListParsed:
+        site_test = site_power_custom(todayStart, todayEnd, site)
+        powerSum.append({"site_name": site, "power_total": site_test["powerSum"], "date": today})
+  
 
-    html = "<body><h1>Plink Sites's Power Daily Report</h1>"
-    html += """<p>This report is sent daily.</p>"""
-    html += "<table><thead><tr><th>Site Name</th><th>Power</th><th>From</th><th>To</th></tr></thead><tbody>"
+    labels = [item["site_name"] for item in powerSum]
+    values = [item["power_total"] / 1000 for item in powerSum]
+    #####CHART CONFIG#####
+    str_obj = {"somedata": "Hello","charType": "bar","values":values}
+    datasetsArr = [str_obj]
+    
+
+    chart_data = {
+        "labels": labels,
+        "datasets": [{"name": "Power", "chartType": "bar","values": values}],
+        "type": "bar"
+    }
+    chardump = json.dumps(chart_data)
+
+    html = f"""
+            <html>
+            <head>
+                <script src="https://unpkg.com/frappe-charts@latest"></script>
+            </head>
+            <body>
+                <h1>Plink Site's Power Daily Report</h1>
+                
+                <hr class="rounded">
+                <div id="chart">
+                </div>
+                <script>
+                var chart_data = JSON.parse('{chardump}')
+                var chart = new frappe.Chart("#chart", {{
+                    type: 'bar',
+                    data: chart_data,
+                    type: "axis-mixed", // or 'bar', 'line', 'pie', 'percentage'
+                    height: 300,
+                    download: true,
+                    colors: ["#0F6292"],
+                    axisOptions: {{
+                    xAxisMode: "tick",
+                    xIsSeries: true
+                    }},
+                    barOptions: {{
+                    stacked: true,
+                    spaceRatio: 0.5
+                    }},
+                    tooltipOptions: {{
+                    formatTooltipX: (d) => (d + "").toUpperCase(),
+                    formatTooltipY: (d) => d + " pts"
+                    }}
+                }});
+                </script>"""
+    html += "<br>"
+    html += "<br>"
+    html += "<br>"
+    html += "<hr class=\"solid\">"  
+    html += "<h2>Site's total power daily today </h2>"
+    html += "<hr class=\"solid\">"  
+    html += "<br>"
+    html += "<table><thead><tr><th colspan=\"5\">Site Name</th><th>Total Power (kWh)</th></tr></thead><tbody>"
+    for data in powerSum:
+        html += "<tr><td colspan=\"5\">{site_name}</td><td>{power}</td></tr>".format(
+            site_name=data['site_name'],
+            power=data['power_total'] / 1000
+        )
+    html += "</tbody></table>"
+    html += "<br>"
+    html += "<br>"
+    html += "<br>"
+    html += "<hr class=\"solid\">"  
+    html += "<h2>Site's power daily detail list </h2>"
+    html += "<hr class=\"solid\">"  
+    html += "<br>"
+    html += "<table><thead><tr><th>Site Name</th><th>Power (kWh)</th><th>From</th><th>To</th></tr></thead><tbody>"
     for data in powerMonthlyArr:
         html += "<tr><td>{site_name}</td><td>{power}</td><td>{from_date}</td><td>{to_date}</td></tr>".format(
             site_name=data['site_name'],
-            power=data['power'],
+            power=data['power'] / 1000,
             from_date=data['from'],
             to_date=data['to']
         )
-    html += "</tbody></table></body>"
-    html += "<style>h1{text-align: center}table, th, td {border: 1px solid black;border-collapse: collapse;}th, td {padding-top: 10px;padding-bottom: 20px;padding-left: 30px;padding-right: 40px;}</style>"
+    html += "</tbody></table>"
+
+   
+
+    html += "</body></html>"
+    html += "<style>table {width: 100%} h1, h2, h3, th, td{text-align: center}table, th, td {border: 1px solid black;border-collapse: collapse;}th, td {padding-top: 10px;padding-bottom: 20px;padding-left: 30px;padding-right: 40px;}</style>"
+
+    #############HTML REPORT EDIT#############
+    # html = "<body><h1>Plink Sites's Power Daily Report</h1>"
+    # html += """<p>This report is sent daily.</p>"""
+    # html += "<table><thead><tr><th>Site Name</th><th>Power</th><th>From</th><th>To</th></tr></thead><tbody>"
+    # for data in powerMonthlyArr:
+    #     html += "<tr><td>{site_name}</td><td>{power}</td><td>{from_date}</td><td>{to_date}</td></tr>".format(
+    #         site_name=data['site_name'],
+    #         power=data['power'],
+    #         from_date=data['from'],
+    #         to_date=data['to']
+    #     )
+    # html += "</tbody></table></body>"
+    # html += "<style>h1{text-align: center}table, th, td {border: 1px solid black;border-collapse: collapse;}th, td {padding-top: 10px;padding-bottom: 20px;padding-left: 30px;padding-right: 40px;}</style>"
     
+
+
+
+
+
     # Generate the PDF from the HTML
-    pdf_content = get_pdf(html)
-    #open the file
-    text_file = open('/home/phuongtung0801/frappe-bench-prod/apps/scheduler_task/scheduler_task/indextung3.html','w')
-    text_file.writelines(html)
-    text_file.close()
-
-    # pdfkit.from_string(pdf_content, '/home/phuongtung0801/frappe-bench-prod/apps/scheduler_task/scheduler_task/indextung.pdf')
-    with open("/home/phuongtung0801/frappe-bench-prod/apps/scheduler_task/scheduler_task/indextung11.pdf", "wb") as f:
-        f.write(pdf_content)
-
+    
     try:
-        frappe.sendmail(
-            recipients=["phuongtung0801+23@gmail.com"],
-            subject="Plink Sites's Power Daily Report",
-            message="Hi, this is the daily sites's power report.",
-            attachments=[{
-                "fname": "plink_sitespower_daily_report.pdf",
-                "fcontent": pdf_content
-            }]
-        )
+        pdf_content = get_pdf(html)
+        # htmlweasy = HTML(html)
+        # pdf_content2 = htmlweasy.write_pdf()
+        #open the file
+        text_file = open('/home/phuongtung0801/frappe-bench-prod/apps/scheduler_task/scheduler_task/indextung3.html','w')
+        text_file.writelines(html)
+        text_file.close()
+
+        # Convert the HTML string to a PDF file
+        pdf_file = html_to_pdf(html)
+        # Save the PDF file
+        with open("/home/phuongtung0801/frappe-bench-prod/apps/scheduler_task/scheduler_task/index.pdf", "wb") as f:
+            f.write(pdf_file.getvalue())
+
+
+        with open("/home/phuongtung0801/frappe-bench-prod/apps/scheduler_task/scheduler_task/indextung113.pdf", "wb") as f:
+            f.write(pdf_content)
     except Exception as e:
-        return ("Error"+str(e))
+        print(e)
+    # try:
+    #     frappe.sendmail(
+    #         recipients=["phuongtung0801+23@gmail.com", "phuongtung.tran0801+23@gmail.com"],
+    #         subject="Plink Sites's Power Daily Report",
+    #         message="Hi, this is the daily sites's power report.",
+    #         delayed= False,
+    #         attachments=[{
+    #             "fname": "plink_sitespower_daily_report.html",
+    #             "fcontent": html
+    #         }]
+    #     )
+    # except Exception as e:
+    #     return ("Error"+str(e))
     return "No Err Found"
     
-# frappe.schedule("*/5 * * * *", send_scheduled_email)
-
-
-# def cron():
-#     print("Hello World")
