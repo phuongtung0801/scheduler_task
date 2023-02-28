@@ -58,7 +58,11 @@ def power_template():
 
 today = date.today()
 site_power_list = power_template()
-
+total_power = 0
+total_income = 0
+for data in site_power_list:
+   total_power += data['total_power'] / 1000
+   total_income += data['total_power'] * 1938 / 1000
 html_template = f"""
 <!DOCTYPE html>
 <html>
@@ -68,17 +72,19 @@ html_template = f"""
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="stylesheet" href="https://www.w3schools.com/w3css/4/w3.css">
 <style>
-body {{font-family: "Times New Roman", Georgia, Serif;}}
+body {{font-family:Georgia, Serif;}}
 h1, h2, h3, h4, h5, h6 {{
   font-family: "Playfair Display";
   letter-spacing: 5px;
 }}
 table {{
     padding: 10px;
+    border-spacing: 0;
   }}
   td, th {{
     padding: 10px;
     text-align: center;
+    border: 1px solid rgb(192, 192, 192);
   }}
   .no-center {{
     text-align: left; /* align the text to the left to exclude it from the center align */
@@ -97,10 +103,11 @@ table {{
 <div class="w3-content" style="max-width:1100px">
 
   <!-- About Section -->
-  <div class="w3-row w3-padding-64" id="about">
-    <div class="w3-col m6 w3-padding-large">
-      <h1 class="w3-center">Site Power Daily</h1><br>
+  <div class="w3-row w3-padding-64" id="menu">
+    <div class="w3-col m6 w3-padding-medium">
+      <h1 class="w3-center">Site Daily Power</h1><br>
       <h5 class="w3-center">Report is taken in {today}</h5>
+      <h5 class="w3-center">from 00:00:00 fo 23:59:59</h5>
       <p class="w3-large no-center">This email was sent automatically by PLINK Smart Technology Joint Stock Company. Below is the daily total sites power report.</p>
     </div>
   </div>
@@ -109,14 +116,14 @@ table {{
   """
 html_template += """
   <div class="w3-row w3-padding-64" id="menu">
-    <div class="w3-col l6 w3-padding-large">
+    <div class="w3-col l6 w3-padding-medium">
 """
 html_template += """<table>
                       <thead><tr>
                         <th colspan=\"5\">Site Name</th>
                         <th colspan=\"5\">Site Design Power</th>
-                        <th colspan=\"5\">Total Power (kWh)</th>
-                        <th colspan=\"5\">Total Income (VND)</th>
+                        <th colspan=\"5\">Today Power (kWh)</th>
+                        <th colspan=\"5\">Today Income (VND)</th>
                         <th colspan=\"5\">Average Run Time</th>
                         <th colspan=\"5\">Reduction Power</th>
                       </tr></thead><tbody>"""
@@ -130,12 +137,18 @@ for data in site_power_list:
                       <td colspan=\"5\">{reduction_power}</td>
                       </tr>""".format(
             site_name=data['name'],
-            power=data['total_power'] / 1000,
-            site_design_power=data['site_design_power'],
-            total_income = data['total_power'] * 1938 / 1000,
-            avg_run_time = format(((data['total_power'] / 1000 ) / data['site_design_power']), '.4f'),
+            power=format((data['total_power'] / 1000), '.1f'),
+            site_design_power=format(data['site_design_power'],'.1f'),
+            total_income = '{:,.1f} VNĐ'.format((data['total_power'] * 1938 / 1000), '.1f'),
+            avg_run_time = format(((data['total_power'] / 1000 ) / data['site_design_power']), '.1f'),
             reduction_power=data['reduction_power']
         )
+html_template +=f"""<tr><td colspan=\"5\"><b>Total Power</b></td>
+                        <td colspan=\"10\"><b>{format(total_power, '.1f')} (kWh)</b></td>
+                        <td colspan=\"5\"><b>Total Income</b></td>
+                        <td colspan=\"10\"><b>{'{:,.1f} VNĐ'.format(total_income, '.1f')}</b></td>
+                    </tr>"""  
+html_template += """"""
 html_template += "</tbody></table>"
 html_template += """
    </div>

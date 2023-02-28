@@ -117,7 +117,10 @@ def cron():
     try:
         frappe.sendmail(
             # recipients=["phuongtung.tran0801+23@gmail.com", "luonghuuphuloc@gmail.com", "baonguyen2409@gmail.com"],
-            recipients=["phuongtung.tran0801+23@gmail.com", "luonghuuphuloc@gmail.com"],
+            recipients=[
+            "phuongtung.tran0801+23@gmail.com",
+            "luonghuuphuloc@gmail.com"
+            ],
             subject="Plink Sites's Power Daily Report",
             message=html_template,
             delayed= False,
