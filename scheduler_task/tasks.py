@@ -116,11 +116,21 @@ def cron():
 
     try:
         frappe.sendmail(
-            # recipients=["phuongtung.tran0801+23@gmail.com", "luonghuuphuloc@gmail.com", "baonguyen2409@gmail.com"],
-            recipients=[
-            "phuongtung.tran0801+23@gmail.com",
-            "luonghuuphuloc@gmail.com"
-            ],
+            recipients=["phuongtung.tran0801+23@gmail.com", "luonghuuphuloc@gmail.com"],
+            # recipients=[
+            # "phuongtung.tran0801+23@gmail.com",
+            # "luonghuuphuloc@gmail.com",
+            # "duongsonba1203@gmail.com",
+            # "baonguyen2409@gmail.com",
+            # "philh@pec.vn",
+            # "phamxuantien1196@gmail.com",
+            # "nhuquynhtrinhthi.99@gmail.com",
+            # "nguyencongthong1407@gmail.com",
+            # "nt.hieu.1911@gmail.com",
+            # "thangpvh@pec.vn",
+            # "hoanl@pec.vn",
+            # "cuongtt@pec.vn"
+            # ],
             subject="Plink Sites's Power Daily Report",
             message=html_template,
             delayed= False,
@@ -129,4 +139,20 @@ def cron():
     except Exception as e:
         return ("Error"+str(e))
     return "No Err Found"
+
+
+@frappe.whitelist()
+def sendEmailReport(emailList):
+    emailListArr = emailList[1:-1].split(", ")
+    try:
+        frappe.sendmail(
+            recipients=emailListArr,
+            subject="Plink Sites's Power Daily Report",
+            message=html_template,
+            delayed= False,
+            attachments=[]
+        )
+    except Exception as e:
+        return ("Error"+str(e))
+    return emailListArr
     

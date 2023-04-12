@@ -1,30 +1,91 @@
 import frappe
 from datetime import date
+import datetime
 
 @frappe.whitelist()
+def count_site_connection(dateFrom, dateTo):
+    queryString = f"""
+        SELECT site_name, COUNT(DISTINCT site_name) as counting
+        FROM `tabAlarm Check List`
+        WHERE
+            start_at BETWEEN "{dateFrom}" AND "{dateTo}"
+        GROUP BY site_name
+            """
+    # return queryString
+    docArr = frappe.db.sql(queryString)
+    res = []
+    for element in docArr:
+        res.append({
+           "site_name": element[0],
+           "count": element[1]
+        })
+    return res 
+
+@frappe.whitelist()
+def connection_count_template():
+
+  #today date time
+  today = date.today()
+  # today = datetime.date(2023, 4, 2)
+  todayStart = str(today) + " 00:00:00"
+  todayEnd = str(today) + " 23:59:59"
+  
+  count_list = count_site_connection(todayStart, todayEnd)
+  
+  return count_list
+
+
+def site_connection(dateFrom, dateTo):
+    queryString = f"""
+        SELECT * FROM `tabAlarm Check List`
+        WHERE
+            start_at BETWEEN "{dateFrom}" AND "{dateTo}"
+        ORDER BY site_name ASC
+            """
+    # return queryString
+    docArr = frappe.db.sql(queryString)
+    res = []
+    for element in docArr:
+        res.append({
+           "site_name": element[9],
+           "inverter": element[16],
+           "lost_connection_time": element[10]
+        })
+    return res 
+
+@frappe.whitelist()
+def connection_template():
+
+  #today date time
+  today = date.today()
+  # today = datetime.date(2023, 4, 2)
+  todayStart = str(today) + " 00:00:00"
+  todayEnd = str(today) + " 23:59:59"
+  
+  site_connection_list = site_connection(todayStart, todayEnd)
+  
+  return site_connection_list
+
+
+@frappe.whitelist()
+#sum(power.power_per_hour) as total_power,
 def site_power_custom(dateFrom, dateTo):
     queryString = f"""SELECT
             site.name,
             site.site_design_power,
             site.site_real_power,
-            sum(power.power_per_hour) as total_power,
+            COALESCE(SUM(power.power_per_hour), 0) AS total_power,
             task.reduction_power
-        FROM `tabSite Power Per Hour` AS power 
-            INNER JOIN `tabSite` AS site ON site.name = power.site_name
-            LEFT JOIN 
-            (
-                SELECT
-                    site,
-                    reduction_power
+            FROM `tabSite` AS site
+            LEFT JOIN `tabSite Power Per Hour` AS power ON site.name = power.site_name AND power.from BETWEEN "{dateFrom}" AND "{dateTo}"
+            LEFT JOIN (
+                SELECT site, reduction_power
                 FROM `tabTask`
-                WHERE
-                    (`tabTask`.exp_start_date between "{dateFrom}" AND "{dateTo}")
+                WHERE `tabTask`.exp_start_date BETWEEN "{dateFrom}" AND "{dateTo}"
                 GROUP BY site
             ) AS task ON power.site_name = task.site
-        WHERE
-             (power.from between "{dateFrom}" AND "{dateTo}")
-        GROUP BY power.site_name
-                    """
+            GROUP BY site.name;
+            """
     # return queryString
     docArr = frappe.db.sql(queryString)
     res = []
@@ -38,16 +99,12 @@ def site_power_custom(dateFrom, dateTo):
         })
     return res 
 
-
-
-
-
-
 @frappe.whitelist()
 def power_template():
 
   #today date time
   today = date.today()
+  # today = datetime.date(2023, 4, 2)
   todayStart = str(today) + " 00:00:00"
   todayEnd = str(today) + " 23:59:59"
   
@@ -56,6 +113,9 @@ def power_template():
   return site_power_list
 
 
+
+####POWER VARIABLE#####
+# today = datetime.date(2023, 4, 2)
 today = date.today()
 site_power_list = power_template()
 total_power = 0
@@ -63,6 +123,25 @@ total_income = 0
 for data in site_power_list:
    total_power += data['total_power'] / 1000
    total_income += data['total_power'] * 1938 / 1000
+
+####CONNECTION VARIABLE#####
+# today = datetime.date(2023, 4, 2)
+today = date.today()
+site_connection_list = connection_template()
+
+
+####COUNT CONNECTION VARIABLE#####
+# today = datetime.date(2023, 4, 2)
+today = date.today()
+count_list = connection_count_template()
+
+
+
+
+
+
+
+################HTML TEMPLATE######################
 html_template = f"""
 <!DOCTYPE html>
 <html>
@@ -105,20 +184,26 @@ table {{
   <!-- About Section -->
   <div class="w3-row w3-padding-64" id="menu">
     <div class="w3-col m6 w3-padding-medium">
-      <h1 class="w3-center">Site Daily Power</h1><br>
+      <h1 class="w3-center">Site daily information</h1><br>
       <h5 class="w3-center">Report is taken in {today}</h5>
-      <h5 class="w3-center">from 00:00:00 fo 23:59:59</h5>
-      <p class="w3-large no-center">This email was sent automatically by PLINK Smart Technology Joint Stock Company. Below is the daily total sites power report.</p>
+      <h5 class="w3-center">from 00:00:00 to 23:59:59</h5>
+      <p class="w3-large no-center">This email was sent automatically by PLINK Smart Technology Joint Stock Company. Below is the daily sites detail power report.</p>
     </div>
   </div>
-  
   <hr>
   """
+
+#####POWER REPORT######
+html_template += """
+      <div class="w3-col m6 w3-padding-medium">
+      <h4 class="w3-center">POWER REPORT</h4>
+      </div>
+"""
 html_template += """
   <div class="w3-row w3-padding-64" id="menu">
     <div class="w3-col l6 w3-padding-medium">
 """
-html_template += """<table>
+html_template += """<table style="width: 100%;">
                       <thead><tr>
                         <th colspan=\"5\">Site Name</th>
                         <th colspan=\"5\">Site Design Power</th>
@@ -139,7 +224,7 @@ for data in site_power_list:
             site_name=data['name'],
             power=format((data['total_power'] / 1000), '.1f'),
             site_design_power=format(data['site_design_power'],'.1f'),
-            total_income = '{:,.1f} VNĐ'.format((data['total_power'] * 1938 / 1000), '.1f'),
+            total_income = '{:,.1f}'.format((data['total_power'] * 1938 / 1000), '.1f'),
             avg_run_time = format(((data['total_power'] / 1000 ) / data['site_design_power']), '.1f'),
             reduction_power=data['reduction_power']
         )
@@ -154,6 +239,79 @@ html_template += """
    </div>
   </div>
 """
+
+
+#####COUNT CONNECTION REPORT######
+html_template += """
+      <div class="w3-col m6 w3-padding-medium">
+      <h4 class="w3-center">CONNECTION LOST REPORT</h4>
+      </div>
+"""
+
+html_template += """
+      <div class="w3-col m6 w3-padding-medium">
+      <h5 class="w3-left">Count lost connection</h5>
+      </div>
+"""
+html_template += """
+  <div>
+    <div class="w3-col l6 w3-padding-medium">
+"""
+html_template += """<table style="width: 100%;">
+                      <thead><tr>
+                        <th colspan=\"5\">Site Name</th>
+                        <th colspan=\"5\">Number of lost connections</th>
+                      </tr></thead><tbody>"""
+for data in count_list:
+  html_template += """<tr>
+                      <td colspan=\"5\">{site_name}</td>
+                      <td colspan=\"5\">{count}</td>
+                      </tr>""".format(
+            site_name=data['site_name'],
+            count=data["count"]
+        )
+html_template += """"""
+html_template += "</tbody></table>"
+html_template += """
+   </div>
+  </div>
+"""
+
+
+
+#####CONNECTION REPORT######
+
+html_template += """
+  <div>
+    <div class="w3-col l6 w3-padding-medium">
+"""
+html_template += """
+      <h5 class="w3-left">Connection lost detail</h5>
+"""
+html_template += """<table style="width: 100%;">
+                      <thead><tr>
+                        <th colspan=\"5\">Site Name</th>
+                        <th colspan=\"5\">Inverter</th>
+                        <th colspan=\"5\">Lost connection time</th>
+                      </tr></thead><tbody>"""
+for data in site_connection_list:
+  html_template += """<tr>
+                      <td colspan=\"5\">{site_name}</td>
+                      <td colspan=\"5\">{inverter}</td>
+                      <td colspan=\"5\">{lost_connection_time}</td>
+                      </tr>""".format(
+            site_name=data['site_name'],
+            inverter=data["inverter"],
+            lost_connection_time=data["lost_connection_time"]
+        )
+html_template += """"""
+html_template += "</tbody></table>"
+html_template += """
+   </div>
+  </div>
+"""
+
+
 
 
 html_template += """
